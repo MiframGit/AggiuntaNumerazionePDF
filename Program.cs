@@ -1,3 +1,7 @@
+using Microsoft.Extensions.Logging;
+using System;
+using System.Windows.Forms;
+
 namespace AggiuntaNumerazionePDF
 {
     internal static class Program
@@ -25,9 +29,9 @@ namespace AggiuntaNumerazionePDF
             //     builder.SetMinimumLevel(LogLevel.Information); // Set the minimum log level.
             // });
             //
-            // var logger = loggerFactory.CreateLogger<Form1>();
+            // var logger = loggerFactory.CreateLogger<MetodoAddPDF>();
             //
-            // Application.Run(new Form1(logger));  // Pass the logger instance to the Form1 constructor
+            //Application.Run(new CambioPDF(logger));  // Pass the logger instance to the Form1 constructor
         }
     }
 }

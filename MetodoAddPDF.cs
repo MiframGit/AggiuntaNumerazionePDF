@@ -2,12 +2,7 @@
 using iTextSharp.text.pdf;
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection.PortableExecutable;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
+using System.IO;
 
 namespace AggiuntaNumerazionePDF
 {
@@ -20,34 +15,90 @@ namespace AggiuntaNumerazionePDF
             _logger = logger;
         }
 
+        public bool ProcessPdfFolder(string inputFolder, string outputFolder)
+        {
+            if (!Directory.Exists(inputFolder))
+            {
+                _logger?.LogError($"Cartella di Input inesistente: {inputFolder}");
+                Console.WriteLine($"Cartella di Input inesistente: {inputFolder}");
+                return false;
+            }
+
+            if (!Directory.Exists(outputFolder))
+            {
+                try
+                {
+                    Directory.CreateDirectory(outputFolder);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogError($"Errore nella creazione della cartella di Output: {ex.Message}");
+                    Console.WriteLine($"Errore nella creazione della cartella di Output: {ex.Message}");
+                    return false;
+                }
+            }
+
+            string[] pdfFiles = Directory.GetFiles(inputFolder, "*.pdf");
+            if (pdfFiles.Length == 0)
+            {
+                _logger?.LogInformation($"Nessun PDF Trovato nella cartella di input: {inputFolder}");
+                Console.WriteLine($"Nessun PDF Trovato nella cartella di input: {inputFolder}");
+                return true; //Considero Successo se non c'è nulla da fare
+            }
+
+            bool allSuccessful = true;
+
+            foreach (string inputPdfPath in pdfFiles)
+            {
+                string filename = Path.GetFileNameWithoutExtension(inputPdfPath);
+                string outputPdfPath = Path.Combine(outputFolder, filename + "_watermark.pdf");
+
+                bool success = AddNumberToFirstPage(inputPdfPath, outputPdfPath);
+                if (!success)
+                {
+                    allSuccessful = false;
+                    _logger?.LogError($"Fallimento processamento PDF: {inputPdfPath}");
+                    Console.WriteLine($"Fallimento processamento PDF: {inputPdfPath}");
+                }
+                else
+                {
+                    _logger?.LogInformation($"PDF processato correttamente: {inputPdfPath} -> {outputPdfPath}");
+                    Console.WriteLine($"PDF processato correttamente: {inputPdfPath} -> {outputPdfPath}");
+                }
+            }
+
+            return allSuccessful;
+        }
+
+
         public bool AddNumberToFirstPage(string inputPdf, string outputPdf)
         {
             if (!inputPdf.ToLower().EndsWith(".pdf"))
             {
-                _logger?.LogError("Input file does not have a .pdf extension.");
-                Console.WriteLine("Input file does not have a .pdf extension.");
+                _logger?.LogError("File Input non ha estensione .pdf");
+                Console.WriteLine("File Input non ha estensione .pdf");
                 return false;
             }
 
             try
             {
-                // 1. Extract the number from the filename (Robust Approach)
+                // 1. Estrai il numero dal nome del file
                 string filename = Path.GetFileNameWithoutExtension(inputPdf);
                 if (!int.TryParse(filename, out int number))
                 {
-                    _logger?.LogError($"Could not extract a valid number from filename: {filename}");
-                    Console.WriteLine($"Could not extract a valid number from filename: {filename}");
-                    return false; // Or throw an exception
+                    _logger?.LogError($"Non sono riuscito ad estrarre un numero valido dal filename: {filename}");
+                    Console.WriteLine($"Non sono riuscito ad estrarre un numero valido dal filename: {filename}");
+                    return false; // O Lancia un'eccezione
                 }
 
                 // 2. Check if the output file exists. Give an opportunity to overwrite
                 if (File.Exists(outputPdf))
                 {
-                    Console.WriteLine($"Output file {outputPdf} already exists. Overwrite? (y/n)");
+                    Console.WriteLine($"Output file {outputPdf} esiste già. Sovrascrivere? (y/n)");
                     string response = Console.ReadLine()?.ToLower();
                     if (response != "y")
                     {
-                        Console.WriteLine("Operation cancelled.");
+                        Console.WriteLine("Operazione cancellata.");
                         return false;
                     }
                 }
@@ -76,104 +127,108 @@ namespace AggiuntaNumerazionePDF
                             }
                             finally
                             {
-                                //bf.Dispose(); // Not strictly needed but good practice for larger fonts
+                                //bf.Dispose(); // Non sempre necessario ma è buona pratica farlo se si usano font grandi
                             }
                         }
                     }
                 }
 
-                _logger?.LogInformation($"Successfully added number {number} to PDF: {inputPdf}");
-                Console.WriteLine($"Successfully added number {number} to PDF: {inputPdf}");
-                return true; // Indicate success
+                _logger?.LogInformation($"PDF processato correttamente: {inputPdf}");
+                Console.WriteLine($"PDF processato correttamente: {inputPdf}");
+                return true; // Indica successo
             }
             catch (IOException ex)
             {
-                _logger?.LogError($"Error accessing file: {ex.Message}");
-                Console.WriteLine($"Error accessing file: {ex.Message}");
+                _logger?.LogError($"Errore accesso file: {ex.Message}");
+                Console.WriteLine($"Errore accesso file: {ex.Message}");
                 return false;
             }
             catch (DocumentException ex) // Catch iTextSharp specific errors
             {
-                _logger?.LogError($"Error processing PDF: {ex.Message}");
-                Console.WriteLine($"Error processing PDF: {ex.Message}");
+                _logger?.LogError($"Errore processamento PDF: {ex.Message}");
+                Console.WriteLine($"Errore processamento PDF: {ex.Message}");
                 return false;
             }
             catch (Exception ex) // Catch any other exceptions
             {
-                _logger?.LogError($"An unexpected error occurred: {ex.Message}");
-                Console.WriteLine($"An unexpected error occurred: {ex.Message}");
+                _logger?.LogError($"Errore inatteso: {ex.Message}");
+                Console.WriteLine($"Errore inatteso: {ex.Message}");
                 return false;
             }
         }
     }
-
-    public partial class CambioPDF : Form
-    {
-        private readonly ILogger<MetodoAddPDF>? _logger; // Logger opzionale
-
-        public CambioPDF(ILogger<MetodoAddPDF>? logger = null)
+        public partial class CambioPDF : Form
         {
-            InitializeComponent();
-            _logger = logger;
-        }
-        private void Form1_Load(object sender, EventArgs e)
-        {
-            string suca = "panzoneConPizzetto";
-        }
+            private readonly ILogger<MetodoAddPDF>? _logger; // Logger opzionale
 
-        private void btnSelectInput_Click(object sender, EventArgs e)
-        {
-            OpenFileDialog openFileDialog = new OpenFileDialog();
-            openFileDialog.Filter = "PDF files (*.pdf)|*.pdf|All files (*.*)|*.*";
-            openFileDialog.Title = "Seleziona un file PDF";
-
-            if (openFileDialog.ShowDialog() == DialogResult.OK)
+            public CambioPDF(ILogger<MetodoAddPDF>? logger = null)
             {
-                txtInputPath.Text = openFileDialog.FileName;
+                InitializeComponent();
+                _logger = logger;
+            }
+            private void Form1_Load(object sender, EventArgs e)
+            {
+                string suca = "panzoneConPizzetto";
+            }
+
+            private void btnSelectInput_Click(object sender, EventArgs e)
+            {
+                FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
+                folderBrowserDialog.Description = "Seleziona la cartella Input";
+                if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
+                {
+                    txtInputPath.Text = folderBrowserDialog.SelectedPath;
+                }
+            }
+
+            private void btnSelectOutputFolder_Click(object sender, EventArgs e)
+            {
+                FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
+                folderBrowserDialog.Description = "Seleziona la cartella Output";
+                if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
+                {
+                    txtOutputPath.Text = folderBrowserDialog.SelectedPath;
+                }
+            }
+
+            private async void btnProcess_Click(object sender, EventArgs e)
+            {
+                string inputFolderPath = txtInputPath.Text;
+                string outputFolderPath = txtOutputPath.Text;
+
+                if (string.IsNullOrEmpty(inputFolderPath) || string.IsNullOrEmpty(outputFolderPath))
+                {
+                    MessageBox.Show("Devi selezionare sia la cartella di Input che quella di Output.");
+                    return;
+                }
+
+                // Visualizza la ProgressBar
+                progressBar.Visible = true;
+
+                // Disabilita il pulsante per evitare click multipli durante l'elaborazione
+                btnProcess.Enabled = false;
+
+                // Use the MetodoAddPDF class
+                MetodoAddPDF pdfProcessor = new MetodoAddPDF(_logger); // Pass the logger if you're using it
+
+                // Esegui il processamento in modo asincrono
+                bool success = await Task.Run(() => pdfProcessor.ProcessPdfFolder(inputFolderPath, outputFolderPath));
+
+                // Dopo aver completato:
+                progressBar.Visible = false;
+                btnProcess.Enabled = true;
+
+                if (success)
+                {
+                    MessageBox.Show($"PDF processati correttamente. PDF salvati su: {outputFolderPath}");
+                    _logger?.LogInformation($"PDFs processed successfully: {outputFolderPath}");
+                }
+                else
+                {
+                    MessageBox.Show("Uno o più processamenti PDF sono falliti. Guardare i logs per i dettagli.");
+                    _logger?.LogError("Processamento PDF Fallito.");
+                }
             }
         }
 
-        private void btnSelectOutputFolder_Click(object sender, EventArgs e)
-        {
-            FolderBrowserDialog folderBrowserDialog = new FolderBrowserDialog();
-            if (folderBrowserDialog.ShowDialog() == DialogResult.OK)
-            {
-                txtOutputPath.Text = folderBrowserDialog.SelectedPath;
-            }
-        }
-
-        private void btnProcess_Click(object sender, EventArgs e)
-        {
-            string inputPdfPath = txtInputPath.Text;
-            string outputPath = txtOutputPath.Text;
-
-            if (string.IsNullOrEmpty(inputPdfPath) || string.IsNullOrEmpty(outputPath))
-            {
-                MessageBox.Show("Please select both input PDF file and output folder.");
-                return;
-            }
-
-            // Create the output file path
-            string outputFileName = System.IO.Path.GetFileNameWithoutExtension(inputPdfPath) + "_watermark.pdf";
-            string outputPdfPath = System.IO.Path.Combine(outputPath, outputFileName);
-
-            // Use the MetodoAddPDF class
-            MetodoAddPDF pdfProcessor = new MetodoAddPDF(_logger); // Pass the logger if you're using it
-
-            // Call the PDF processing method
-            bool success = pdfProcessor.AddNumberToFirstPage(inputPdfPath, outputPdfPath);
-
-            if (success)
-            {
-                MessageBox.Show($"PDF processato correttamente. PDF salvato su: {outputPdfPath}");
-                _logger?.LogInformation($"PDF processed successfully: {outputPdfPath}");
-            }
-            else
-            {
-                MessageBox.Show("Processo fallito. Guardare i logs per i dettagli.");
-                _logger?.LogError("PDF processing failed.");
-            }
-        }
     }
-
-}
