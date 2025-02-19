@@ -118,7 +118,7 @@ namespace AggiuntaNumerazionePDF
         }
         private void Form1_Load(object sender, EventArgs e)
         {
-
+            string suca = "panzoneConPizzetto";
         }
 
         private void btnSelectInput_Click(object sender, EventArgs e)
